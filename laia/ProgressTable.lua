@@ -77,9 +77,11 @@ function ProgressTable:write(epoch, train_summary, valid_summary, is_better)
     if self._opt.cer_confidence_interval and train_summary.cer_ci and
     valid_summary.cer_ci then
       header = header .. ' TRAIN_CER_LO'
-      if valid_summary then header = header .. ' VALID_CER_LO' end
       header = header .. ' TRAIN_CER_UP'
-      if valid_summary then header = header .. ' VALID_CER_UP' end
+      if valid_summary then
+	header = header .. ' VALID_CER_LO'
+	header = header .. ' VALID_CER_UP'
+      end
     elseif self._opt.cer_confidence_interval then
       laia.log.warn('Confidence interval cannot be written to the progress ' ..
 		    'table because your summaries do not include them. ' ..

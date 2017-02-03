@@ -17,7 +17,7 @@ local parser = laia.argparse(){
 parser:option(
   '--cnn_batch_norm',
   'Batch normalization before the activation in each conv layer.',
-  {false}, toboolean)
+  {false}, laia.toboolean)
   :argname('<bool>')  -- Placeholder
   :args('+')          -- Option with >= 1 arguments
 
@@ -33,7 +33,7 @@ parser:option(
   '--cnn_spatial_dropout',
   'Use spatial dropout at the input of each conv layer, instead of the ' ..
   'regular dropout.',
-  {false}, toboolean)
+  {false}, laia.toboolean)
   :argname('<bool>')
   :args('+')
 

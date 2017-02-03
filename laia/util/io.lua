@@ -37,9 +37,15 @@ function laia.check_contiguous_int2sym(int2sym)
   return true
 end
 
-function laia.read_transcripts_table(filename, sym2int, transcripts)
+function laia.read_transcripts_table(filename, sym2int, transcripts, sym_count)
   local num_transcripts = 0
   transcripts = transcripts or {}  -- If transcripts table is given, update it
+  sym_count = sym_count or {}  -- If counts table is given, update it
+  for key,val in pairs(sym2int) do
+    if sym_count[val] == nil then
+      sym_count[val] = 0
+    end
+  end
   local f = io.open(filename, 'r')
   assert(f ~= nil, ('Unable to read transcripts table: %q'):format(filename))
   local ln = 0
@@ -58,6 +64,8 @@ function laia.read_transcripts_table(filename, sym2int, transcripts)
 	assert(sym2int[sym] ~= nil,
 	       ('Symbol %q is not in the symbols table'):format(sym))
 	table.insert(transcripts[id], sym2int[sym])
+        local isym = sym2int[sym]
+        sym_count[isym] = sym_count[isym] + 1
       else
 	assert(laia.isint(sym),
 	       ('Token %q is not an integer and no symbols table was given.')
@@ -67,7 +75,7 @@ function laia.read_transcripts_table(filename, sym2int, transcripts)
     end
   end
   f:close()
-  return num_transcripts, transcripts
+  return num_transcripts, transcripts, sym_count
 end
 
 -- Load sample files and IDs from list. The IDs are the basenames of the files,

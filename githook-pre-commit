@@ -23,7 +23,7 @@ if [ ! -h "$GITDIR/hooks/pre-commit" ]; then
 fi
 
 ### Update version on every commit ###
-if [ "$(git status --porcelain)" != "" ]; then
+if [ "$(git status --porcelain | grep -c ^M)" != 0 ]; then
   echo "${0##*/}: updating version in laia/Version.lua" 1>&2;
   sed -i 's|$Date[ :0-9-]*\$|$Date: '"$(date -u '+%Y-%m-%d %H:%M:%S')"' $|;' laia/Version.lua;
   git add laia/Version.lua;

@@ -64,7 +64,7 @@ function EpochCheckpoint:setModel(model)
     self._model = EpochCheckpoint._cloneToCPU(model)
     self._model:clearState()
     -- By default, use all the possible nn layers to maximize portability.
-    if cudnn then model = cudnn.convert(self._model, nn) end
+    if cudnn then cudnn.convert(self._model, nn) end
   else
     self._model = nil
   end
@@ -130,7 +130,7 @@ function EpochCheckpoint._cloneToCPU(obj, tensorCache)
     for k, v in pairs(obj) do
       new_obj[k] = EpochCheckpoint._cloneToCPU(v, tensorCache)
     end
-    obj = new_obj
+    obj, new_obj = new_obj, nil
   elseif
     torch.isTypeOf(obj, 'nn.Module') or
     torch.isTypeOf(obj, 'nn.Criterion')
@@ -141,7 +141,7 @@ function EpochCheckpoint._cloneToCPU(obj, tensorCache)
       new_obj[k] = EpochCheckpoint._cloneToCPU(v, tensorCache)
     end
     new_obj._type = _cloneToCPU_typemap[obj._type]
-    obj = new_obj
+    obj, new_obj = new_obj, nil
   elseif torch.isTensor(obj) then
     if tensorCache[obj] then
       obj = tensorCache[obj]
@@ -157,7 +157,7 @@ function EpochCheckpoint._cloneToCPU(obj, tensorCache)
 	  if obj:storage():size() > 0 then
 	    new_storage:resize(obj:storage():size()):copy(obj:storage())
 	  end
-	  tensorCache[storage_key] = new_storage
+	  tensorCache[storage_key], new_storage = new_storage, nil
 	end
 	assert(torch.type(tensorCache[storage_key]) == storage_type)
 	new_obj:set(
@@ -169,7 +169,7 @@ function EpochCheckpoint._cloneToCPU(obj, tensorCache)
       end
       assert(torch.type(new_obj) == new_type)
       tensorCache[obj] = new_obj
-      obj = new_obj
+      obj, new_obj = new_obj, nil
     end
   end
   return obj

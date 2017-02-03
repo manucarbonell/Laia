@@ -41,6 +41,10 @@ parser:option(
 parser:option(
   '--batch_size -b', 'Batch size', 16, laia.toint)
   :ge(1)
+parser:option(
+  '--output_hpad', 'If given, write the horizontal padding applied to each ' ..
+    'image to this file.', '')
+  :argname('<file>')
 
 -- Parse options
 local opts = parser:parse()
@@ -85,15 +89,23 @@ local output_align = opts.output_align == '-' and io.stdout or
 assert(output_align ~= nil, 'File %q could not be opened for writing!',
        opts.output_align)
 
+-- Open file to write the horizontal padding of each sample.
+local output_hpad = nil
+if opts.output_hpad ~= '' then
+  output_hpad = opts.output_hpad == '-' and io.stdout or
+    io.open(opts.output_hpad, 'w')
+  assert(output_hpad ~= nil, 'File %q could not be opened for writing!',
+   opts.output_hpad)
+end
+
 -- Open file to write the label priors.
 local output_prior = opts.output_prior == '-' and io.stdout or
   opts.output_prior ~= '' and io.open(opts.output_prior, 'w') or nil
 
 local prior_count = nil
-local n = 0
 for b=1,batcher:numSamples(),opts.batch_size do
   -- Prepare batch
-  local batch_img, batch_gt, _, batch_ids = batcher:next(opts.batch_size)
+  local batch_img, batch_gt, _, batch_ids, batch_hpad = batcher:next(opts.batch_size)
   if opts.gpu > 0 then batch_img = batch_img:cuda() end
   -- Forward through network, and copy to the CPU
   local output = model:forward(batch_img):float()
@@ -102,17 +114,24 @@ for b=1,batcher:numSamples(),opts.batch_size do
   output = output:view(num_frames, opts.batch_size, output:size(2))
   output = output:permute(2, 1, 3):contiguous()
 
+  -- Write horizontal padding of each sample
+  if output_hpad then
+    for i=1,opts.batch_size do
+      if i+b-1 > batcher:numSamples() then break end
+      output_hpad:write(('%s %d %d %d\n'):format(
+    batch_ids[i], batch_hpad[i][1], batch_hpad[i][2], batch_hpad[i][3]))
+    end
+    output_hpad:flush()
+  end
+
   -- Initialize prior count
   if output_prior and not prior_count then
     prior_count = torch.LongTensor(output:size(3)):zero()
   end
 
   for i=1,opts.batch_size do
-    n = n + 1
     -- Batch can contain more images, stop here.
-    if n > batcher:numSamples() then
-      break
-    end
+    if i+b-1 > batcher:numSamples() then break end
 
     -- Do forced alignment of the sample w.r.t. batch_gt[i]
     laia.log.info('Performing forced alignment of sample %q', batch_ids[i])
@@ -136,6 +155,9 @@ end
 
 -- Close files
 output_align:close()
+if output_hpad then
+  output_hpad:close()
+end
 
 -- Output priors and total counts
 if output_prior and prior_count then

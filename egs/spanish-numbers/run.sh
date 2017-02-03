@@ -22,12 +22,13 @@ mkdir -p data/;
   tar -xzf data/Spanish_Number_DB.tgz -C data/;
 
 ./steps/prepare.sh --overwrite "$overwrite";
+num_symbols=$[$(wc -l data/lang/char/symbs.txt | cut -d\  -f1) - 1];
 
 [ -f model.t7 -a "$overwrite" = false ] || {
   th ../../laia-create-model \
     --cnn_batch_norm true \
     --cnn_type leakyrelu \
-    -- 1 64 $[$(wc -l data/lang/char/symbs.txt) - 1] model.t7;
+    -- 1 64 $num_symbols model.t7;
 
   th ../../laia-train-ctc \
     --adversarial_weight 0.5 \

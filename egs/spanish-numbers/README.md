@@ -46,9 +46,9 @@ tar -xvzf data/Spanish_Number_DB.tgz -C data/;
   --use_distortions true \
   --early_stop_epochs 100 \
   --learning_rate 0.0005 \
-  model.t7 data/lang/chars/symbs.txt \
-  data/train.lst data/lang/chars/train.txt \
-  data/test.lst data/lang/chars/test.txt;
+  model.t7 data/lang/char/symbs.txt \
+  data/train.lst data/lang/char/train.txt \
+  data/test.lst data/lang/char/test.txt;
 ```
 
 After 366 epochs the model achieves a CER=~2.08% in test, with a 95% confidence

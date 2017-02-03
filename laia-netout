@@ -5,7 +5,8 @@ require 'laia'
 local batcher = laia.RandomBatcher()
 local parser = laia.argparse(){
   name = 'laia-netout',
-  description = ''
+  description = 'Computes network outputs in diverse formats for a given' ..
+    'model and image list.'
 }
 
 -- Register laia.Version options
@@ -40,13 +41,13 @@ parser:option(
   ' Kaldi\'s archive of matrices (one for each sample), where each row is a ' ..
     'timestep and each column represents a label; use "lattice" to get a ' ..
     'Kaldi\'s archive of CompactLattices.', 'matrix',
-  {matrix = 'matrix', lattice = 'lattice'})
+  {matrix = 'matrix', lattice = 'lattice', htk = 'htk', maxseq = 'maxseq'})
   :argname('<fmt>')
 parser:option(
   '--output_transform', 'Apply this transformation at the end of the model. ' ..
     'For instance, use "softmax" to get posterior probabilities as the ' ..
     'output of the model.',
-  '', { [''] = '', softmax = 'softmax', logsoftmax = 'logsoftmax' })
+  '', { [''] = '', softmax = 'softmax', logsoftmax = 'logsoftmax', negsoftmax = 'negsoftmax', neglogsoftmax = 'neglogsoftmax' })
 parser:option(
   '--prior', 'File containing the label priors used to compute the ' ..
     'log-likelihood: log p(x|s) = log P(s|x) - alpha * log P(s) ' ..
@@ -73,10 +74,13 @@ local model = laia.Checkpoint():load(opts.checkpoint):Best():getModel()
 assert(model ~= nil, 'No model was found in the checkpoint file!')
 
 -- Add custom output layers.
-if opts.output_transform == 'softmax' then
-  model:add(nn.SoftMax())
-elseif opts.output_transform == 'logsoftmax' or opts.prior ~= '' then
+if opts.prior ~= '' or opts.output_transform == 'logsoftmax' or opts.output_transform == 'neglogsoftmax' then
   model:add(nn.LogSoftMax())
+elseif opts.output_transform == 'softmax' or opts.output_transform == 'negsoftmax' then
+  model:add(nn.SoftMax())
+end
+if opts.output_transform == 'negsoftmax' or opts.output_transform == 'neglogsoftmax' then
+  model:add(nn.MulConstant(-1,true))
 end
 
 -- If a GPU is requested, check that we have everything necessary.
@@ -101,7 +105,7 @@ if opts.auto_width_factor then
   local width_factor = laia.getWidthFactor(model)
   batcher:setOptions({width_factor = width_factor})
   laia.log.info('Batcher width factor was automatically set to %d',
-		width_factor)
+                width_factor)
 end
 batcher:load(opts.image_list)
 batcher:epochReset()
@@ -112,14 +116,22 @@ if opts.output_hpad ~= '' then
   output_hpad = opts.output_hpad == '-' and io.stdout or
     io.open(opts.output_hpad, 'w')
   assert(output_hpad ~= nil, 'File %q could not be opened for writing!',
-	 opts.output_hpad)
+         opts.output_hpad)
 end
 
 -- Open output file
-local output_file = opts.output == '-' and io.stdout or
-  io.open(opts.output, 'w')
-assert(output_file ~= nil, 'File %q could not be opened for writing!',
-       opts.output)
+local output_file = io.stdout
+if opts.output_format ~= 'htk' then
+  output_file = opts.output == '-' and io.stdout or io.open(opts.output, 'w')
+  assert(output_file ~= nil, 'File %q could not be opened for writing!',
+         opts.output)
+end
+
+-- HTK format aux variables
+local nSamples = torch.IntStorage(1);
+local sampPeriod = torch.IntStorage(1); sampPeriod[1] = 100000; -- 10000000 = 1seg
+local sampSize = torch.ShortStorage(1);
+local parmKind = torch.ShortStorage(1); parmKind[1] = 9; -- PARMKIND=USER
 
 -- Function used to load the priors file
 local function load_priors(fpriors, alpha)
@@ -156,15 +168,15 @@ for b=1,batcher:numSamples(),opts.batch_size do
   local output = model:forward(batch_img):float()
   -- Change output layout to batch_size x timesteps x labels
   output = output:view(output:size(1) / opts.batch_size,
-		       opts.batch_size, output:size(2))
+                       opts.batch_size, output:size(2))
   output = output:permute(2, 1, 3):contiguous()
 
   -- Write horizontal padding of each sample
   if output_hpad then
     for i=1,opts.batch_size do
-      if i > batcher:numSamples() then break end
+      if i+b-1 > batcher:numSamples() then break end
       output_hpad:write(('%s %d %d %d\n'):format(
-	  batch_ids[i], batch_hpad[i][1], batch_hpad[i][2], batch_hpad[i][3]))
+          batch_ids[i], batch_hpad[i][1], batch_hpad[i][2], batch_hpad[i][3]))
     end
     output_hpad:flush()
   end
@@ -179,31 +191,68 @@ for b=1,batcher:numSamples(),opts.batch_size do
   if opts.output_format == 'matrix' then
     -- Output as a Kaldi's table of matrices
     for i=1,opts.batch_size do
-      if i > batcher:numSamples() then break end
+      if i+b-1 > batcher:numSamples() then break end
       output_file:write(('%s [\n'):format(batch_ids[i]))
       for t=1,output:size(2) do
-	for k=1,output:size(3) do
-	  output_file:write(('%.10g '):format(output[i][t][k]))
-	end
-	output_file:write('\n')
+        for k=1,output:size(3) do
+          output_file:write(('%.10g '):format(output[{i,t,k}]))
+        end
+        output_file:write('\n')
       end
       output_file:write(']\n')
     end
     output_file:flush()
+
   elseif opts.output_format == 'lattice' then
     -- Output as a Kaldi's table of lattices
     for i=1,opts.batch_size do
-      if i > batcher:numSamples() then break end
+      if i+b-1 > batcher:numSamples() then break end
       output_file:write(('%s\n'):format(batch_ids[i]))
       for t=1,output:size(2) do
-	for k=1,output:size(3) do
-	  output_file:write(('%d\t%d\t%d\t0,%.10g,%d\n'):format(
-	      t - 1, t, k, output[i][t][k], k))
-	end
+        for k=1,output:size(3) do
+          output_file:write(('%d\t%d\t%d\t0,%.10g,%d\n'):format(
+              t - 1, t, k, output[{i,t,k}], k))
+        end
       end
       output_file:write(('%d\t0,0,\n\n'):format(output:size(2)))
     end
     output_file:flush()
+
+  elseif opts.output_format == 'htk' then
+    -- Output as a HTK feats
+    for i=1,opts.batch_size do
+      if i+b-1 > batcher:numSamples() then break end
+      local fd = torch.DiskFile( opts.output..'/'..batch_ids[i]..'.fea', 'w' ):binary():bigEndianEncoding()
+      local outputi = output[i]
+      nSamples[1] = outputi:size(1)
+      sampSize[1] = 4*outputi:size(2)
+      fd:writeInt( nSamples[1] )
+      fd:writeInt( sampPeriod[1] )
+      fd:writeShort( sampSize[1] )
+      fd:writeShort( parmKind[1] )
+      for t=1,outputi:size(1) do
+        for k=1,outputi:size(2) do
+          fd:writeFloat( outputi[{t,k}] )
+        end
+      end
+      fd:close()
+    end
+
+  elseif opts.output_format == 'maxseq' then
+    -- Output as sequence of maximums
+    for i=1,opts.batch_size do
+      if i+b-1 > batcher:numSamples() then break end
+      local maxval, maxidx = torch.max(output[i],2)
+      maxval = maxval:squeeze();
+      maxidx = maxidx:squeeze();
+      output_file:write(batch_ids[i]..' '..torch.mean(maxval))
+      for t=1,maxval:size(1) do
+        output_file:write(' '..maxidx[t]..':'..maxval[t])
+      end
+      output_file:write('\n')
+    end
+    output_file:flush()
+
   end
 end
 

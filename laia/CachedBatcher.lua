@@ -87,6 +87,10 @@ function CachedBatcher:numChannels()
   return self._channels
 end
 
+function CachedBatcher:symCount()
+  return self._sym_count
+end
+
 function CachedBatcher:cacheType()
   -- Note: GPU index starts at 1, <= 0 is used for the CPU
   return self._opt.cache_gpu > 0 and 'torch.CudaTensor' or 'torch.FloatTensor'
@@ -108,6 +112,7 @@ function CachedBatcher:clearDataset()
   self._num_symbols = 0
   self._sym2int = {}
   self._int2sym = {}
+  self._sym_count = {}
   self._idx = 0
   self._channels = nil
   self:clearCache()
@@ -127,7 +132,7 @@ function CachedBatcher:load(img_list, gt_file, symbols_table)
     assert(laia.check_contiguous_int2sym(self._int2sym),
 	   'The symbol numeric IDs must be sequential integers from 1.')
     -- Load sample transcripts
-    laia.read_transcripts_table(gt_file, self._sym2int, self._gt)
+    laia.read_transcripts_table(gt_file, self._sym2int, self._gt, self._sym_count)
   end
 
   -- Load image list and sample IDs.
@@ -148,6 +153,9 @@ function CachedBatcher:next(batch_size, batch_img)
   local batch_hpad = {}
   assert(batch_size > 0, 'Batch size must be greater than 0!')
   assert(self._num_samples > 0, 'The dataset is empty!')
+  if self:_global2cacheIndex(1 + (batch_size - 1 + self._idx) % self._num_samples) < 0 then
+    self:clearCache() -- To prevent filling the cache twice in the second for i=0,(batch_size-1) loop
+  end
   -- Get sizes of each sample in the batch
   local batch_sizes = torch.LongTensor(batch_size, 2)
   for i=0,(batch_size-1) do

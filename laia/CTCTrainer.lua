@@ -60,7 +60,7 @@ end
 function CTCTrainer:setDistorter(distorter)
   self._distorter = distorter
   self._initialized = false
-  if self._distorter then
+  if self._distorter and self._opt.use_distortions then
     laia.log.info('CTCTrainer uses the distorter:\n' ..
 		    self._distorter:__tostring__())
   end
@@ -173,8 +173,10 @@ function CTCTrainer:start()
   assert(self._model ~= nil)
   assert(self._train_batcher ~= nil and self._train_batcher:numSamples() > 0)
   assert(self._optimizer ~= nil)
-  assert(self._distorter or not self._use_distortions,
+  assert(self._distorter or not self._opt.use_distortions,
 	 'No distorter passed to the CTCTrainer, but --use_distortions=true')
+  assert(self._train_batcher:symCount()[0] == 0,
+         'CTC non-character symbol found in transcripts')
 
   -- Flatten the model parameters into a single big chunk of memory.
   self._parameters, self._gradParameters = self._model:getParameters()
@@ -356,6 +358,10 @@ function CTCTrainer:_fbPass(batch_img, batch_gt, do_backprop)
   local output = self._model.output
   -- Set _gradOutput to have the same size as the output and fill it with zeros
   self._gradOutput = self._gradOutput:typeAs(output):resizeAs(output):zero()
+
+  assert(self._train_batcher:numSymbols() == output:size(2),
+         ('Expected model output to have %d dimensions and got %d'):format(
+           self._train_batcher:numSymbols(), output:size(2)))
 
   -- TODO(jpuigcerver): This assumes that all sequences have the same number
   -- of frames, which should not be the case, since padding should be ignored!

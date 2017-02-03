@@ -7,11 +7,13 @@ Laia is a deep learning toolkit to transcribe handwritten text images.
 If you find this toolkit useful in your research, please cite:
 
 ```
-@inproceedings{laia,
-  title={},
-  author={Joan Puigcerver, Daniel Martin-Albo, Mauricio Villegas},
-  booktitle={},
-  year={}
+@misc{laia2016,
+  author = {Joan Puigcerver, Daniel Martin-Albo, Mauricio Villegas},
+  title = {Laia: A deep learning toolkit for HTR},
+  year = {2016},
+  publisher = {GitHub},
+  note = {GitHub repository},
+  howpublished = {\url{https://github.com/jpuigcerver/Laia}},
 }
 ```
 
@@ -29,8 +31,8 @@ Once Torch is installed the following luarocks are required:
 - You also have to  install the [cuDNN bindings for Torch](https://github.com/soumith/cudnn.torch)
 - [Baidu's CTC](https://github.com/baidu-research/warp-ctc)
 - [imgdistort](https://github.com/jpuigcerver/imgdistort)
-- base64: Use `luarocks install lbase64`
-- etlua: Use `luarocks install etlua`
+
+And execute `luarocks install https://raw.githubusercontent.com/jpuigcerver/Laia/master/rocks/laia-scm-1.rockspec`.
 
 ## Usage
 
@@ -47,8 +49,7 @@ Positional arguments:
 - `$((NUM_SYMB+1))`: number of output symbols. Note: Include **ONE** additional element for the CTC blank symbol.
 - `$MODEL_DIR/model.t7`: path to the output model.
 
-For optional arguments check `laia-create-model -h`.
-
+For optional arguments check `laia-create-model -h` or `laia-create-model -H`.
 
 Train the model using:
 ```bash
@@ -65,7 +66,7 @@ Positional arguments:
 - `$VALID_LST` is a file containing a list of images for validation.
 - `$VALID_GT` is a file containing the list of validation transcripts.
 
-For optional arguments check `laia-train-ctc -h`.
+For optional arguments check `laia-train-ctc -h` or `laia-create-model -H`.
 
 ### Transcribing
 

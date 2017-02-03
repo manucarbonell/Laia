@@ -48,6 +48,15 @@ local modes = {
   { name = "fatal", color = "\27[35m", },
 }
 
+local levels = {
+  ['trace'] = 1,
+  ['debug'] = 2,
+  ['info']  = 3,
+  ['warn']  = 4,
+  ['error'] = 5,
+  ['fatal'] = 6,
+}
+
 -- Utility function to register logging options, common to all tools.
 log.registerOptions = function(parser, advanced)
   advanced = advanced or false
@@ -82,12 +91,6 @@ log.registerOptions = function(parser, advanced)
     :argname('<level>')
     :bind(log, 'logstderrthreshold')
     :advanced(advanced)
-end
-
-
-local levels = {}
-for i, v in ipairs(modes) do
-  levels[v.name] = i
 end
 
 

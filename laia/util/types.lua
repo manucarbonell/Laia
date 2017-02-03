@@ -43,7 +43,7 @@ end
 -- Given a string that represents a list of NUMBERS separated by commas,
 -- returns a table with the list items.
 function laia.tolistnum(x)
-  local sx = string.split(x, '[^,]+')
+  local sx = laia.strsplit(x, '[^,]+')
   local rx = {}
   for _, v in ipairs(sx) do
     local v2 = tonumber(v)
@@ -56,7 +56,7 @@ end
 -- Given a string that represents a list of INTEGERS separated by commas,
 -- returns a table with the list items.
 function laia.tolistint(x)
-  local sx = string.split(x, '[^,]+')
+  local sx = laia.strsplit(x, '[^,]+')
   local rx = {}
   for _, v in ipairs(sx) do
     local v2 = laia.toint(v)
