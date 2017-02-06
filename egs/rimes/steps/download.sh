@@ -44,3 +44,11 @@ done;
   tar xf data/a2ia/training_2011_gray.tar -C data/a2ia || exit 1;
 [ -s data/a2ia/images_gray/eval2011-0.png ] ||
   tar xf data/a2ia/eval_2011_gray.tar -C data/a2ia || exit 1;
+
+# Apply patch to the training XML
+[ -s data/a2ia/training_2011.patched.xml ] ||
+patch -odata/a2ia/training_2011.patched.xml \
+  data/a2ia/training_2011.xml data/a2ia/training_2011.patch ||
+exit 1;
+
+exit 0;
