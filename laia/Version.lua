@@ -2,7 +2,7 @@ require 'laia.ClassWithOptions'
 
 local Version, Parent = torch.class('laia.Version', 'laia.ClassWithOptions')
 
-Version.DATE = '$Date: 2017-02-06 17:04:39 $'
+Version.DATE = '$Date: 2017-02-06 19:45:56 $'
 
 function Version:registerOptions(parser)
   parser:flag(
