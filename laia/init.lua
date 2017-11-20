@@ -52,6 +52,7 @@ wrequire('laia.ImageDistorter')
 
 laia.nn = {}
 require('laia.nn.ImageColumnSequence')
+require('laia.nn.SpatialConvolutionGate')
 
 -- Determine whether stdout/stderr are terminals or not. If term package
 -- cannot be loaded, assume they ARE NOT terminals (i.e. no colors shown).

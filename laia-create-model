@@ -76,6 +76,22 @@ parser:option(
   :args('+')
 
 parser:option(
+  '--cnn_gate_kernel_size', 'Kernel size of the convolution gates. ' ..
+  'Separate each dimension with commas (order: width,height).',
+  {{0}}, laia.tolistint)
+  :argname('<size>')
+  :args('+')
+  :assert(function(t) return table.all(t, function(x) return x > 0 end) end)
+  :tostring(function(x) return table.concat(table.map(x, tostring), ',') end)
+
+parser:option(
+  '--cnn_gate_depthwise', 'If true, use depth-wise convolution in ' ..
+  'the convolution gates.',
+  {true}, laia.toboolean)
+  :argname('<bool>')
+  :args('+')
+
+parser:option(
   '--rnn_dropout',
   'Dropout probability at the input of each recurrent layer, 0 <= p < 1.',
   0.5, tonumber)
@@ -150,10 +166,16 @@ table.append_last(opt.cnn_type, cnn_layers - #opt.cnn_type)
 table.append_last(opt.cnn_dropout, cnn_layers - #opt.cnn_dropout)
 table.append_last(opt.cnn_spatial_dropout,
 		  cnn_layers - #opt.cnn_spatial_dropout)
+table.append_last(opt.cnn_gate_kernel_size,
+		  cnn_layers - #opt.cnn_gate_kernel_size)
+table.append_last(opt.cnn_gate_depthwise,
+		  cnn_layers - #opt.cnn_gate_depthwise)
 
 -- Kernel sizes must be pairs of integers
 opt.cnn_kernel_size = table.map(
   opt.cnn_kernel_size, function(x) return table.append_last(x, 2 - #x) end)
+opt.cnn_gate_kernel_size = table.map(
+  opt.cnn_gate_kernel_size, function(x) return table.append_last(x, 2 - #x) end)
 
 -- Maxpool sizes must be pairs of integers
 opt.cnn_maxpool_size = table.map(
@@ -167,11 +189,16 @@ local function convBlock(
     depth_in, depth_out,  -- Input & output channels/filters
     kernel_w, kernel_h,   -- Size of the convolution kernels
     pool_w, pool_h,       -- Size of the pooling windows
-    activation, batch_norm, dropout, spatial_dropout)
+    activation, batch_norm, dropout, spatial_dropout,
+    conv_gate_w, conv_gate_h, conv_gate_depthwise)
   activation = activation or 'relu'
   batch_norm = batch_norm or false
   dropout = dropout or 0
   spatial_dropout = spatial_dropout or false
+  conv_gate_w = conv_gate_w or 0
+  conv_gate_h = conv_gate_h or 0
+  conv_gate_depthwise = conv_gate_depthwise or false
+
   local block = nn.Sequential()
   -- Spatial dropout to the input of the convolutional block
   if dropout > 0 then
@@ -208,6 +235,12 @@ local function convBlock(
   else
     assert(false, string.format('Unknown activation function %s', activation))
   end
+  -- Gated Convolution
+  if conv_gate_w > 1 or conv_gate_h > 1 then
+    block:add(laia.nn.SpatialConvolutionGate(depth_out,
+					     conv_gate_w, conv_gate_h,
+					     conv_gate_depthwise))
+  end
   -- Max pooling
   if pool_w > 0 and pool_h > 0 then
     block:add(nn.SpatialMaxPooling(pool_w, pool_h, pool_w, pool_h))
@@ -233,7 +266,10 @@ for i=1,cnn_layers do
 		      opt.cnn_kernel_size[i][1], opt.cnn_kernel_size[i][2],
 		      opt.cnn_maxpool_size[i][1], opt.cnn_maxpool_size[i][2],
 		      opt.cnn_type[i], opt.cnn_batch_norm[i],
-		      opt.cnn_dropout[i], opt.cnn_spatial_dropout[i]))
+		      opt.cnn_dropout[i], opt.cnn_spatial_dropout[i],
+		      opt.cnn_gate_kernel_size[i][1],
+  		      opt.cnn_gate_kernel_size[i][2],
+		      opt.cnn_gate_depthwise[i]))
   curr_h = computeSizeAfterPooling(curr_h, opt.cnn_maxpool_size[i][2])
   curr_c = opt.cnn_num_features[i]
 end
