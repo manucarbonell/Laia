@@ -44,3 +44,14 @@ luac.out
 
 # Ignore Python compiled files
 *.pyc
+*.lst
+*.t7
+*.csv
+
+egs/esposalles/.idea
+egs/esposalles/evaluate2.py
+egs/esposalles/GroundTruth
+egs/esposalles/data/lang/char/test.txt
+egs/esposalles/errors
+egs/esposalles/results*
+egs/esposalles/models
